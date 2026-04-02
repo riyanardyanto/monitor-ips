@@ -8,6 +8,25 @@ Desktop GUI untuk memeriksa completeness form Excel IPS berdasarkan cell wajib d
 .venv\Scripts\python.exe main.py
 ```
 
+## Build EXE
+
+Build final executable menggunakan file spec yang sudah disiapkan:
+
+```powershell
+.venv\Scripts\python.exe -m PyInstaller --clean "IPS Checker.spec"
+```
+
+Hasil build akan tersedia di folder:
+
+```powershell
+dist\IPS Checker.exe
+```
+
+Catatan:
+
+- Gunakan file `IPS Checker.spec` agar resource Flet dan `field_cell.txt` ikut terbundle dengan benar.
+- Jangan build dengan command PyInstaller minimal tanpa file spec, karena aplikasi membutuhkan data tambahan saat dijalankan sebagai `.exe`.
+
 ## Fitur
 
 - Pilih folder atau satu file Excel

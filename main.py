@@ -29,6 +29,7 @@ else:
 
 
 LOG_FILE = APP_DIR / "ips-checker-error.log"
+ICON_FILE = RESOURCE_DIR / "assets" / "app_icon.ico"
 
 
 def write_error_log(context: str, exc: BaseException) -> Path:
@@ -85,6 +86,8 @@ def main(page: ft.Page) -> None:
     page.theme_mode = ft.ThemeMode.LIGHT
     page.bgcolor = "#f4f1e8"
     page.scroll = ft.ScrollMode.AUTO
+    if ICON_FILE.exists():
+        page.window.icon = str(ICON_FILE)
     page.theme = ft.Theme(
         color_scheme=ft.ColorScheme(
             primary="#0f5c4d",
@@ -159,6 +162,15 @@ def main(page: ft.Page) -> None:
         actions_alignment=ft.MainAxisAlignment.END,
         scrollable=True,
     )
+    info_dialog = ft.AlertDialog(
+        modal=True,
+        bgcolor="#fffaf0",
+        shape=ft.RoundedRectangleBorder(radius=18),
+        title=ft.Text("Info GUI", weight=ft.FontWeight.W_700, color="#16302b"),
+        actions=[ft.TextButton("Tutup")],
+        actions_alignment=ft.MainAxisAlignment.END,
+        scrollable=True,
+    )
     clipboard_service = ft.Clipboard()
     folder_button = ft.Button(
         content=ft.Text("Pilih Folder", weight=ft.FontWeight.W_600),
@@ -204,6 +216,70 @@ def main(page: ft.Page) -> None:
             shape=ft.RoundedRectangleBorder(radius=14),
         ),
     )
+    info_button = ft.Button(
+        content=ft.Text("Info", weight=ft.FontWeight.W_600),
+        icon=ft.Icons.INFO_OUTLINE_ROUNDED,
+        width=side_button_width,
+        style=ft.ButtonStyle(
+            bgcolor="#e9dfc9",
+            color="#16302b",
+            padding=ft.Padding.symmetric(horizontal=18, vertical=16),
+            shape=ft.RoundedRectangleBorder(radius=14),
+        ),
+    )
+    app_logo = ft.Container(
+        width=side_button_width,
+        padding=ft.Padding.symmetric(horizontal=14, vertical=14),
+        bgcolor="#efe4ce",
+        border=ft.Border.all(1, "#d9c9ab"),
+        border_radius=18,
+        content=ft.Column(
+            spacing=10,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Container(
+                    width=54,
+                    height=54,
+                    bgcolor="#0f5c4d",
+                    border_radius=16,
+                    content=ft.Stack(
+                        controls=[
+                            ft.Container(
+                                left=0,
+                                right=0,
+                                top=0,
+                                bottom=0,
+                                content=ft.Text(
+                                    "IPS",
+                                    color="#fffaf0",
+                                    weight=ft.FontWeight.W_700,
+                                    text_align=ft.TextAlign.CENTER,
+                                    size=15,
+                                ),
+                            ),
+                            ft.Container(
+                                right=4,
+                                bottom=4,
+                                width=14,
+                                height=14,
+                                bgcolor="#c96f3b",
+                                border_radius=999,
+                            ),
+                        ]
+                    ),
+                ),
+                ft.Column(
+                    spacing=2,
+                    tight=True,
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[
+                        ft.Text("IPS Checker", weight=ft.FontWeight.W_700, color="#16302b", size=17, text_align=ft.TextAlign.CENTER),
+                        ft.Text("Monitor completeness form IPS", color="#6b4f3a", size=11, text_align=ft.TextAlign.CENTER),
+                    ],
+                ),
+            ],
+        ),
+    )
     def refresh_busy_state() -> None:
         is_loading = bool(app_state["is_loading"])
         is_picker_open = bool(app_state["is_picker_open"])
@@ -215,6 +291,7 @@ def main(page: ft.Page) -> None:
         file_button.disabled = is_busy
         csv_button.disabled = is_busy
         share_button.disabled = is_busy
+        info_button.disabled = is_busy
 
     def set_loading(is_loading: bool) -> None:
         app_state["is_loading"] = is_loading
@@ -327,6 +404,11 @@ def main(page: ft.Page) -> None:
 
     def close_share_dialog(_: ft.ControlEvent) -> None:
         share_dialog.open = False
+        page.pop_dialog()
+        page.update()
+
+    def close_info_dialog(_: ft.ControlEvent) -> None:
+        info_dialog.open = False
         page.pop_dialog()
         page.update()
 
@@ -654,6 +736,60 @@ def main(page: ft.Page) -> None:
         share_dialog.open = True
         page.show_dialog(share_dialog)
 
+    def show_info_dialog(_: ft.ControlEvent) -> None:
+        def info_bullet(icon, title: str, description: str) -> ft.Control:
+            return ft.Row(
+                spacing=10,
+                vertical_alignment=ft.CrossAxisAlignment.START,
+                controls=[
+                    ft.Icon(icon, size=18, color="#0f5c4d"),
+                    ft.Column(
+                        spacing=2,
+                        tight=True,
+                        expand=True,
+                        controls=[
+                            ft.Text(title, weight=ft.FontWeight.W_700, color="#16302b", size=13),
+                            ft.Text(description, color="#4b5d58", size=12),
+                        ],
+                    ),
+                ],
+            )
+
+        info_dialog.content = ft.Container(
+            width=620,
+            content=ft.Column(
+                spacing=12,
+                tight=True,
+                controls=[
+                    ft.Text("Informasi GUI", weight=ft.FontWeight.W_700, color="#16302b"),
+                    ft.Text(
+                        "Aplikasi ini dipakai untuk memeriksa completeness form IPS dari satu file Excel atau satu folder file Excel.",
+                        color="#4b5d58",
+                    ),
+                    ft.Divider(color="#d9c9ab"),
+                    ft.Text("Cara menggunakan", weight=ft.FontWeight.W_700, color="#16302b"),
+                    info_bullet(ft.Icons.FOLDER_OPEN_ROUNDED, "Pilih sumber file", "Gunakan Pilih Folder untuk banyak file atau Pilih File untuk satu dokumen Excel."),
+                    info_bullet(ft.Icons.PLAY_ARROW_ROUNDED, "Pemeriksaan otomatis", "Setelah file atau folder dipilih, proses check berjalan otomatis dan hasil muncul di panel kanan."),
+                    info_bullet(ft.Icons.VISIBILITY_ROUNDED, "Lihat detail", "Icon mata pada kolom Action membuka detail completeness per file."),
+                    info_bullet(ft.Icons.ASSIGNMENT_TURNED_IN_ROUNDED, "Lihat follow up", "Icon follow up menampilkan data section 1.5 yang terisi."),
+                    info_bullet(ft.Icons.DOWNLOAD_ROUNDED, "Export hasil", "Gunakan Export PDF untuk ringkasan PDF dan Simpan CSV untuk menentukan lokasi hasil CSV."),
+                    ft.Divider(color="#d9c9ab"),
+                    ft.Text("Dokumen IPS dianggap complete jika", weight=ft.FontWeight.W_700, color="#16302b"),
+                    info_bullet(ft.Icons.CHECK_CIRCLE_OUTLINE_ROUNDED, "Section 1.1 dan 1.2 valid", "Semua field wajib terisi, dengan trigger 1.1 cukup salah satu dari C6, C8, C10, atau C12."),
+                    info_bullet(ft.Icons.RULE_FOLDER_OUTLINED, "Section 1.3 valid", "Setiap item hanya boleh punya satu nilai OK, NOK, atau NA, dan cell lain harus kosong."),
+                    info_bullet(ft.Icons.TABLE_ROWS_ROUNDED, "Section 1.4 valid", "Minimal satu row penuh pada 66, 68, 70, 72, 74, 76, atau 78. Row terisi lain tidak boleh parsial."),
+                    info_bullet(ft.Icons.TABLE_ROWS_ROUNDED, "Section 1.5 valid", "Minimal satu row penuh pada 88, 97, 106, 115, 124, atau 133. Row terisi lain tidak boleh parsial."),
+                    info_bullet(ft.Icons.TASK_ALT_ROUNDED, "Status COMPLETE", "File dinyatakan complete jika semua rule section terpenuhi tanpa field atau row rule yang gagal."),
+                ],
+            ),
+        )
+        info_dialog.actions = [ft.TextButton("Tutup", on_click=close_info_dialog)]
+        if getattr(info_dialog, "open", False):
+            page.update()
+            return
+        info_dialog.open = True
+        page.show_dialog(info_dialog)
+
     def show_result_details(result: dict[str, object]) -> None:
         status_label = "COMPLETE" if result["is_complete"] else "INCOMPLETE"
         section_completeness = result.get("section_completeness", {})
@@ -970,7 +1106,7 @@ def main(page: ft.Page) -> None:
             expand=True,
             spacing=18,
             controls=[
-                ft.Text("IPS Form Completeness", size=30, weight=ft.FontWeight.W_700, color="#16302b"),
+                app_logo,
                 ft.Text(
                     "Pilih folder atau file Excel. Pemeriksaan akan langsung berjalan otomatis.",
                     color="#6b4f3a",
@@ -979,6 +1115,7 @@ def main(page: ft.Page) -> None:
                 file_button,
                 csv_button,
                 share_button,
+                info_button,
                 ft.Container(expand=True),
                 ft.Divider(color="#e6dac6", height=1),
                 ft.Container(
@@ -1018,6 +1155,7 @@ def main(page: ft.Page) -> None:
     file_button.on_click = pick_target_file
     csv_button.on_click = pick_csv_output
     share_button.on_click = export_results_summary_pdf_action
+    info_button.on_click = show_info_dialog
 
     page.add(
         ft.ResponsiveRow(

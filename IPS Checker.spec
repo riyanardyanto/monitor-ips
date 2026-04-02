@@ -7,6 +7,7 @@ flet_datas = collect_data_files('flet')
 flet_desktop_datas = collect_data_files('flet_desktop')
 project_datas = [
     ('field_cell.txt', '.'),
+    ('assets/app_icon.ico', 'assets'),
 ]
 
 a = Analysis(
@@ -31,6 +32,7 @@ exe = EXE(
     a.datas,
     [],
     name='IPS Checker',
+    icon='assets/app_icon.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
