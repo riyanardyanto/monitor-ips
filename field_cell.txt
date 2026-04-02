@@ -1,0 +1,40 @@
+section 1.1 
+trigger (c6,c8,c10,c12)
+line (p6)
+date (p8)
+participant (o10)
+technology (q14)
+le champ id (x14)
+losses (b19)
+evidence (p19)
+
+section 1.2
+What (b26)
+Where (r26)
+To Whom (b39)
+How (r39)
+Which (b45)
+When (r45)
+Who (b51)
+How Much (r51)
+NEW REFOCUSED (b57)
+
+section 1.3
+cil (c66,e66,g66)
+dh (c68,e68,g68)
+cl (c70,e70,g70)
+pm (c72,e72,g72)
+wpi (c74,e74,g74)
+wpi co (c76,e76,g76)
+q (c78,e78,g78)
+
+section 1.4
+standard (m66:m78)
+Tindakan (t66:t78)
+responsible (y66:y78)
+due date (aa66:aa78)
+
+section 1.5
+countermeasure (x88:x133)
+responsible (y88:y133)
+due date (z88:z133)
