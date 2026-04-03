@@ -31,8 +31,8 @@ Catatan:
 
 - Pilih folder atau satu file Excel
 - Pilih file mapping field
-- Opsi nama sheet
 - Simpan hasil ringkas ke CSV
+- Simpan config lokal untuk path terakhir, lokasi CSV terakhir, mode sheet terakhir, dan ukuran window
 - Tampilan hasil per file dengan jumlah field kosong per section
 
 ## Fitur GUI
@@ -42,8 +42,9 @@ Catatan:
 - Dialog `Follow Up` menampilkan data section `1.5` yang terisi, yaitu `countermeasure`, `responsible`, dan `due date`.
 - Tombol `Share` pada dialog `Detail` menampilkan QR Code berisi summary completeness file yang sedang dipilih.
 - Tombol `Share` pada dialog `Follow Up` menampilkan QR Code berisi summary data follow up section `1.5`.
-- Tombol `Export PDF` di side panel membuat file PDF berisi summary laporan data completeness form IPS yang sedang ada di tabel.
+- Tombol `Export` di side panel menampilkan pilihan export `PDF`, `JPG`, atau `JSON` untuk summary laporan data completeness form IPS yang sedang ada di tabel.
 - Dialog `Share` juga menyediakan tombol `Copy Summary` untuk menyalin isi summary ke clipboard.
+- Aplikasi menyimpan file config lokal `ips-checker-config.json` untuk mengingat folder/file terakhir, lokasi CSV terakhir, mode sheet, nama sheet custom, dan ukuran window terakhir.
 
 ## Kriteria Complete
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime
 from io import BytesIO
+import json
 from pathlib import Path
 import sys
 import tkinter as tk
@@ -11,6 +12,7 @@ from tkinter import filedialog
 
 import flet as ft
 import qrcode
+from PIL import Image, ImageDraw, ImageFont
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
@@ -30,6 +32,9 @@ else:
 
 LOG_FILE = APP_DIR / "ips-checker-error.log"
 ICON_FILE = RESOURCE_DIR / "assets" / "app_icon.ico"
+CONFIG_FILE = APP_DIR / "ips-checker-config.json"
+DEFAULT_WINDOW_WIDTH = 1180
+DEFAULT_WINDOW_HEIGHT = 820
 
 
 def write_error_log(context: str, exc: BaseException) -> Path:
@@ -49,6 +54,80 @@ def write_error_log(context: str, exc: BaseException) -> Path:
     with LOG_FILE.open("a", encoding="utf-8") as log_file:
         log_file.write(log_entry)
     return LOG_FILE
+
+
+def sanitize_window_size(value: object, fallback: int) -> int:
+    try:
+        parsed_value = int(float(value))
+    except (TypeError, ValueError):
+        return fallback
+    return parsed_value if parsed_value >= 600 else fallback
+
+
+def load_app_config(default_target_path: Path, default_field_file: Path) -> dict[str, object]:
+    config = {
+        "target_path": str(default_target_path),
+        "field_file": str(default_field_file),
+        "sheet_mode": "auto",
+        "sheet_name": None,
+        "csv_output": str(APP_DIR / "report.csv"),
+        "window_width": DEFAULT_WINDOW_WIDTH,
+        "window_height": DEFAULT_WINDOW_HEIGHT,
+    }
+
+    if not CONFIG_FILE.exists():
+        return config
+
+    try:
+        loaded_config = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    except Exception as exc:
+        write_error_log("Gagal membaca file config", exc)
+        return config
+
+    if not isinstance(loaded_config, dict):
+        return config
+
+    target_path = str(loaded_config.get("target_path") or config["target_path"])
+    field_file = str(loaded_config.get("field_file") or config["field_file"])
+    csv_output = str(loaded_config.get("csv_output") or config["csv_output"])
+    sheet_mode = str(loaded_config.get("sheet_mode") or "auto").strip().lower()
+    if sheet_mode not in {"auto", "custom"}:
+        sheet_mode = "auto"
+
+    sheet_name_raw = loaded_config.get("sheet_name")
+    sheet_name = str(sheet_name_raw).strip() if sheet_name_raw else None
+    if sheet_mode == "auto":
+        sheet_name = None
+
+    return {
+        "target_path": target_path,
+        "field_file": field_file,
+        "sheet_mode": sheet_mode,
+        "sheet_name": sheet_name,
+        "csv_output": csv_output,
+        "window_width": sanitize_window_size(loaded_config.get("window_width"), DEFAULT_WINDOW_WIDTH),
+        "window_height": sanitize_window_size(loaded_config.get("window_height"), DEFAULT_WINDOW_HEIGHT),
+    }
+
+
+def resolve_initial_directory(path_value: str | None, fallback: Path) -> str:
+    if not path_value:
+        return str(fallback)
+
+    candidate = Path(path_value)
+    if not candidate.is_absolute():
+        candidate = (APP_DIR / candidate).resolve()
+
+    if candidate.is_file():
+        candidate = candidate.parent
+
+    if candidate.exists():
+        return str(candidate)
+
+    if candidate.parent.exists():
+        return str(candidate.parent)
+
+    return str(fallback)
 
 
 def with_hidden_tk_root(action):
@@ -79,9 +158,11 @@ def main(page: ft.Page) -> None:
     if not default_target_path.exists():
         default_target_path = APP_DIR
 
+    persisted_config = load_app_config(default_target_path, default_field_file)
+
     page.title = "IPS Completeness Checker"
-    page.window_width = 1180
-    page.window_height = 820
+    page.window_width = int(persisted_config["window_width"])
+    page.window_height = int(persisted_config["window_height"])
     page.padding = 24
     page.theme_mode = ft.ThemeMode.LIGHT
     page.bgcolor = "#f4f1e8"
@@ -108,10 +189,13 @@ def main(page: ft.Page) -> None:
         controls=[loading_indicator, loading_text],
     )
     app_state = {
-        "target_path": str(default_target_path),
-        "field_file": str(default_field_file),
-        "sheet_name": None,
-        "csv_output": str(APP_DIR / "report.csv"),
+        "target_path": str(persisted_config["target_path"]),
+        "field_file": str(persisted_config["field_file"]),
+        "sheet_mode": str(persisted_config["sheet_mode"]),
+        "sheet_name": persisted_config["sheet_name"],
+        "csv_output": str(persisted_config["csv_output"]),
+        "window_width": int(persisted_config["window_width"]),
+        "window_height": int(persisted_config["window_height"]),
         "is_loading": False,
         "is_picker_open": False,
     }
@@ -171,6 +255,15 @@ def main(page: ft.Page) -> None:
         actions_alignment=ft.MainAxisAlignment.END,
         scrollable=True,
     )
+    export_dialog = ft.AlertDialog(
+        modal=True,
+        bgcolor="#fffaf0",
+        shape=ft.RoundedRectangleBorder(radius=18),
+        title=ft.Text("Pilih Tipe Export", weight=ft.FontWeight.W_700, color="#16302b"),
+        actions=[ft.TextButton("Tutup")],
+        actions_alignment=ft.MainAxisAlignment.END,
+        scrollable=True,
+    )
     clipboard_service = ft.Clipboard()
     folder_button = ft.Button(
         content=ft.Text("Pilih Folder", weight=ft.FontWeight.W_600),
@@ -206,7 +299,7 @@ def main(page: ft.Page) -> None:
         ),
     )
     share_button = ft.Button(
-        content=ft.Text("Export PDF", weight=ft.FontWeight.W_600),
+        content=ft.Text("Export", weight=ft.FontWeight.W_600),
         icon=ft.Icons.DOWNLOAD_ROUNDED,
         width=side_button_width,
         style=ft.ButtonStyle(
@@ -293,6 +386,28 @@ def main(page: ft.Page) -> None:
         share_button.disabled = is_busy
         info_button.disabled = is_busy
 
+    def persist_config() -> None:
+        config_payload = {
+            "target_path": app_state["target_path"],
+            "field_file": app_state["field_file"],
+            "sheet_mode": app_state["sheet_mode"],
+            "sheet_name": app_state["sheet_name"],
+            "csv_output": app_state["csv_output"],
+            "window_width": app_state["window_width"],
+            "window_height": app_state["window_height"],
+        }
+        try:
+            CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+            CONFIG_FILE.write_text(json.dumps(config_payload, indent=2), encoding="utf-8")
+        except Exception as exc:
+            write_error_log("Gagal menyimpan file config", exc)
+
+    def sync_window_size_from_page() -> None:
+        width = page.window_width or page.width or app_state["window_width"]
+        height = page.window_height or page.height or app_state["window_height"]
+        app_state["window_width"] = sanitize_window_size(width, int(app_state["window_width"]))
+        app_state["window_height"] = sanitize_window_size(height, int(app_state["window_height"]))
+
     def set_loading(is_loading: bool) -> None:
         app_state["is_loading"] = is_loading
         refresh_busy_state()
@@ -317,11 +432,12 @@ def main(page: ft.Page) -> None:
         selected_path = with_hidden_tk_root(
             lambda _: filedialog.askdirectory(
                 title="Pilih folder Excel",
-                initialdir=str(APP_DIR),
+                initialdir=resolve_initial_directory(str(app_state["target_path"]), APP_DIR),
             )
         )
         if selected_path:
             app_state["target_path"] = selected_path
+            persist_config()
             set_picker_open(False)
             start_run_check(selected_path)
             return
@@ -336,12 +452,13 @@ def main(page: ft.Page) -> None:
         selected_path = with_hidden_tk_root(
             lambda _: filedialog.askopenfilename(
                 title="Pilih file Excel",
-                initialdir=str(APP_DIR),
+                initialdir=resolve_initial_directory(str(app_state["target_path"]), APP_DIR),
                 filetypes=[("Excel files", "*.xlsx")],
             )
         )
         if selected_path:
             app_state["target_path"] = selected_path
+            persist_config()
             set_picker_open(False)
             start_run_check(selected_path)
             return
@@ -356,16 +473,25 @@ def main(page: ft.Page) -> None:
         selected_path = with_hidden_tk_root(
             lambda _: filedialog.asksaveasfilename(
                 title="Simpan hasil CSV",
-                initialdir=str(APP_DIR),
-                initialfile="report.csv",
+                initialdir=resolve_initial_directory(str(app_state["csv_output"]), APP_DIR),
+                initialfile=Path(str(app_state["csv_output"])).name,
                 defaultextension=".csv",
                 filetypes=[("CSV files", "*.csv")],
             )
         )
         if selected_path:
             app_state["csv_output"] = selected_path
+            persist_config()
         set_picker_open(False)
         page.update()
+
+    def handle_page_resize(_: ft.ControlEvent) -> None:
+        sync_window_size_from_page()
+        persist_config()
+
+    def handle_page_close(_: ft.ControlEvent) -> None:
+        sync_window_size_from_page()
+        persist_config()
 
     def build_completeness_cell(result: dict[str, object]) -> ft.Control:
         completeness = float(result["completeness_percentage"])
@@ -409,6 +535,11 @@ def main(page: ft.Page) -> None:
 
     def close_info_dialog(_: ft.ControlEvent) -> None:
         info_dialog.open = False
+        page.pop_dialog()
+        page.update()
+
+    def close_export_dialog(_: ft.ControlEvent) -> None:
+        export_dialog.open = False
         page.pop_dialog()
         page.update()
 
@@ -540,40 +671,305 @@ def main(page: ft.Page) -> None:
         story.append(results_table_pdf)
         document.build(story)
 
-    def export_results_summary_pdf_action(_: ft.ControlEvent) -> None:
-        if app_state["is_picker_open"] or app_state["is_loading"]:
-            return
-        if not table_state["results"]:
-            notify("Belum ada hasil pemeriksaan untuk dibuatkan PDF.", error=True)
-            return
+    def export_results_summary_json(output_path: Path) -> None:
+        results = list(table_state["results"])
+        if not results:
+            raise ValueError("Belum ada hasil pemeriksaan untuk dibuatkan JSON.")
 
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "generated_at": datetime.now().isoformat(timespec="seconds"),
+            "summary": summary_text.value or "",
+            "results_count": len(results),
+            "results": results,
+        }
+        output_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def export_results_summary_jpg(output_path: Path) -> None:
+        results = list(table_state["results"])
+        if not results:
+            raise ValueError("Belum ada hasil pemeriksaan untuk dibuatkan JPG.")
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        base_font = ImageFont.load_default()
+        title_font = ImageFont.load_default()
+        image_width = 1600
+        margin_x = 56
+        top_margin = 44
+        card_gap = 18
+        row_gap = 6
+        line_gap = 6
+
+        sample_draw = ImageDraw.Draw(Image.new("RGB", (10, 10), "white"))
+
+        def line_height_for(font: ImageFont.ImageFont) -> int:
+            bbox = sample_draw.textbbox((0, 0), "Ag", font=font)
+            return bbox[3] - bbox[1]
+
+        def wrap_text_to_width(text: object, max_width: int, font: ImageFont.ImageFont) -> list[str]:
+            normalized_text = str(text or "-").strip() or "-"
+            wrapped_lines: list[str] = []
+            for paragraph in normalized_text.splitlines() or [normalized_text]:
+                words = paragraph.split()
+                if not words:
+                    wrapped_lines.append("")
+                    continue
+                current_line = words[0]
+                for word in words[1:]:
+                    candidate = f"{current_line} {word}"
+                    if sample_draw.textlength(candidate, font=font) <= max_width:
+                        current_line = candidate
+                    else:
+                        wrapped_lines.append(current_line)
+                        current_line = word
+                wrapped_lines.append(current_line)
+            return wrapped_lines or ["-"]
+
+        def draw_text_lines(
+            draw: ImageDraw.ImageDraw,
+            lines: list[str],
+            x: int,
+            y: int,
+            font: ImageFont.ImageFont,
+            fill: str,
+            extra_gap: int = line_gap,
+        ) -> int:
+            current_y = y
+            text_line_height = line_height_for(font)
+            for line in lines:
+                draw.text((x, current_y), line, fill=fill, font=font)
+                current_y += text_line_height + extra_gap
+            return current_y
+
+        def draw_card(
+            draw: ImageDraw.ImageDraw,
+            left: int,
+            top: int,
+            width: int,
+            height: int,
+            title: str,
+            value: str,
+            accent_color: str,
+        ) -> None:
+            draw.rounded_rectangle((left, top, left + width, top + height), radius=24, fill="#fffaf0", outline="#d9c9ab", width=2)
+            draw.rounded_rectangle((left + 18, top + 18, left + 58, top + 58), radius=14, fill=accent_color)
+            draw.text((left + 78, top + 18), title, fill="#6b4f3a", font=base_font)
+            draw.text((left + 78, top + 52), value, fill="#16302b", font=title_font)
+
+        complete_count = sum(1 for result in results if result["is_complete"])
+        incomplete_count = len(results) - complete_count
+        average_completeness = sum(float(result["completeness_percentage"]) for result in results) / len(results)
+
+        summary_value = summary_text.value or (
+            f"{len(results)} file diperiksa | {incomplete_count} file incomplete | {complete_count} file complete"
+        )
+        summary_lines = wrap_text_to_width(summary_value, image_width - (margin_x * 2) - 40, base_font)
+
+        columns = [
+            ("No", 70),
+            ("File Name", 620),
+            ("Participant", 270),
+            ("Status", 220),
+            ("Completeness", 220),
+        ]
+        table_left = margin_x
+        table_width = sum(width for _, width in columns)
+        header_height = 170
+        cards_top = top_margin + header_height - 18
+        card_width = (table_width - (card_gap * 3)) // 4
+        card_height = 108
+        table_top = cards_top + card_height + 32
+        body_line_height = line_height_for(base_font)
+
+        prepared_rows: list[dict[str, object]] = []
+        for index, result in enumerate(results, start=1):
+            status_label = "COMPLETE" if result["is_complete"] else "INCOMPLETE"
+            completeness_label = f"{float(result['completeness_percentage']):.2f}%"
+            row_cells = [
+                wrap_text_to_width(str(index), columns[0][1] - 24, base_font),
+                wrap_text_to_width(result["file_name"], columns[1][1] - 24, base_font),
+                wrap_text_to_width(result.get("participant") or "-", columns[2][1] - 24, base_font),
+                wrap_text_to_width(status_label, columns[3][1] - 24, base_font),
+                wrap_text_to_width(completeness_label, columns[4][1] - 24, base_font),
+            ]
+            max_lines = max(len(cell_lines) for cell_lines in row_cells)
+            row_height = max(44, 18 + max_lines * (body_line_height + line_gap))
+            prepared_rows.append(
+                {
+                    "cells": row_cells,
+                    "status": status_label,
+                    "row_height": row_height,
+                }
+            )
+
+        table_header_height = 48
+        footer_height = 48
+        image_height = table_top + table_header_height + sum(int(row["row_height"]) + row_gap for row in prepared_rows) + footer_height + 30
+
+        image = Image.new("RGB", (image_width, max(900, image_height)), "#f4f1e8")
+        draw = ImageDraw.Draw(image)
+
+        draw.rounded_rectangle((24, 24, image_width - 24, image_height - 24), radius=32, fill="#f7efe0")
+        draw.rounded_rectangle((margin_x, top_margin, image_width - margin_x, top_margin + header_height), radius=32, fill="#efe4ce")
+        draw.rounded_rectangle((margin_x + 24, top_margin + 24, margin_x + 92, top_margin + 92), radius=20, fill="#0f5c4d")
+        draw.ellipse((margin_x + 70, top_margin + 62, margin_x + 94, top_margin + 86), fill="#c96f3b")
+        draw.text((margin_x + 118, top_margin + 26), "IPS Completeness Summary", fill="#16302b", font=title_font)
+        draw.text((margin_x + 118, top_margin + 58), f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", fill="#6b4f3a", font=base_font)
+        draw_text_lines(draw, summary_lines, margin_x + 118, top_margin + 88, base_font, "#4b5d58", extra_gap=4)
+
+        draw_card(draw, table_left, cards_top, card_width, card_height, "Total File", str(len(results)), "#0f5c4d")
+        draw_card(draw, table_left + card_width + card_gap, cards_top, card_width, card_height, "Complete", str(complete_count), "#245a4a")
+        draw_card(draw, table_left + (card_width + card_gap) * 2, cards_top, card_width, card_height, "Incomplete", str(incomplete_count), "#a63d40")
+        draw_card(draw, table_left + (card_width + card_gap) * 3, cards_top, card_width, card_height, "Avg Completeness", f"{average_completeness:.1f}%", "#c96f3b")
+
+        draw.rounded_rectangle((table_left, table_top, table_left + table_width, table_top + table_header_height), radius=20, fill="#16302b")
+        current_x = table_left
+        for column_name, column_width in columns:
+            draw.text((current_x + 14, table_top + 15), column_name, fill="#fffaf0", font=base_font)
+            current_x += column_width
+
+        current_y = table_top + table_header_height + 10
+        for row_index, row in enumerate(prepared_rows):
+            row_height = int(row["row_height"])
+            status_label = str(row["status"])
+            status_bg = "#e3f1ea" if status_label == "COMPLETE" else "#f7dfdf"
+            status_fg = "#245a4a" if status_label == "COMPLETE" else "#a63d40"
+            row_bg = "#fffaf0" if row_index % 2 == 0 else "#fcf5e8"
+            draw.rounded_rectangle((table_left, current_y, table_left + table_width, current_y + row_height), radius=18, fill=row_bg, outline="#e0d2b7")
+
+            current_x = table_left
+            for cell_index, ((_, column_width), cell_lines) in enumerate(zip(columns, row["cells"])):
+                cell_x = current_x + 14
+                cell_y = current_y + 12
+                if cell_index == 3:
+                    badge_width = min(column_width - 28, max(110, int(sample_draw.textlength(status_label, font=base_font)) + 38))
+                    badge_height = 30
+                    draw.rounded_rectangle(
+                        (cell_x, cell_y, cell_x + badge_width, cell_y + badge_height),
+                        radius=15,
+                        fill=status_bg,
+                    )
+                    draw.text((cell_x + 14, cell_y + 8), status_label, fill=status_fg, font=base_font)
+                else:
+                    draw_text_lines(draw, list(cell_lines), cell_x, cell_y, base_font, "#16302b", extra_gap=4)
+                current_x += column_width
+
+            current_y += row_height + row_gap
+
+        draw.text((table_left, current_y + 14), "Generated by IPS Checker", fill="#9a8874", font=base_font)
+        image.save(output_path, format="JPEG", quality=95)
+
+    def request_export_path(dialog_title: str, extension: str) -> Path | None:
         set_picker_open(True)
         page.update()
-        default_pdf_name = f"ips-completeness-summary-{datetime.now().strftime('%Y%m%d-%H%M%S')}.pdf"
+        timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        default_name = f"ips-completeness-summary-{timestamp}.{extension}"
         selected_path = with_hidden_tk_root(
             lambda _: filedialog.asksaveasfilename(
-                title="Simpan summary PDF",
-                initialdir=str(APP_DIR),
-                initialfile=default_pdf_name,
-                defaultextension=".pdf",
-                filetypes=[("PDF files", "*.pdf")],
+                title=dialog_title,
+                initialdir=resolve_initial_directory(str(app_state["csv_output"]), APP_DIR),
+                initialfile=default_name,
+                defaultextension=f".{extension}",
+                filetypes=[(f"{extension.upper()} files", f"*.{extension}")],
             )
         )
         set_picker_open(False)
         page.update()
-
         if not selected_path:
+            return None
+        return Path(selected_path)
+
+    def export_results_by_type(export_type: str) -> None:
+        if app_state["is_picker_open"] or app_state["is_loading"]:
+            return
+        if not table_state["results"]:
+            notify("Belum ada hasil pemeriksaan untuk diexport.", error=True)
+            return
+
+        export_type = export_type.lower()
+        export_map = {
+            "pdf": ("Simpan summary PDF", "pdf", export_results_summary_pdf),
+            "jpg": ("Simpan summary JPG", "jpg", export_results_summary_jpg),
+            "json": ("Simpan summary JSON", "json", export_results_summary_json),
+        }
+        if export_type not in export_map:
+            notify(f"Tipe export tidak dikenali: {export_type}", error=True)
+            return
+
+        dialog_title, extension, exporter = export_map[export_type]
+        output_path = request_export_path(dialog_title, extension)
+        if output_path is None:
             return
 
         try:
-            export_results_summary_pdf(Path(selected_path))
+            exporter(output_path)
         except Exception as exc:
-            log_path = write_error_log("Export PDF summary gagal", exc)
+            log_path = write_error_log(f"Export {export_type.upper()} summary gagal", exc)
             notify(str(exc), error=True)
             notify(f"Log error tersimpan di: {log_path.name}", error=True)
             return
 
-        notify("Summary PDF berhasil dibuat.")
+        notify(f"Summary {export_type.upper()} berhasil dibuat.")
+
+    def handle_export_option(export_type: str) -> None:
+        if getattr(export_dialog, "open", False):
+            export_dialog.open = False
+            page.pop_dialog()
+            page.update()
+        export_results_by_type(export_type)
+
+    def show_export_dialog(_: ft.ControlEvent) -> None:
+        if app_state["is_picker_open"] or app_state["is_loading"]:
+            return
+        if not table_state["results"]:
+            notify("Belum ada hasil pemeriksaan untuk diexport.", error=True)
+            return
+
+        export_dialog.content = ft.Container(
+            width=460,
+            content=ft.Column(
+                spacing=12,
+                tight=True,
+                controls=[
+                    ft.Text(
+                        "Pilih format file export untuk ringkasan hasil pemeriksaan.",
+                        color="#4b5d58",
+                    ),
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Button(
+                                content=ft.Text("PDF", weight=ft.FontWeight.W_600),
+                                icon=ft.Icons.PICTURE_AS_PDF_ROUNDED,
+                                width=130,
+                                style=ft.ButtonStyle(bgcolor="#0f5c4d", color="#fffaf0"),
+                                on_click=lambda _: handle_export_option("pdf"),
+                            ),
+                            ft.Button(
+                                content=ft.Text("JPG", weight=ft.FontWeight.W_600),
+                                icon=ft.Icons.IMAGE_ROUNDED,
+                                width=130,
+                                style=ft.ButtonStyle(bgcolor="#c96f3b", color="#fffaf0"),
+                                on_click=lambda _: handle_export_option("jpg"),
+                            ),
+                            ft.Button(
+                                content=ft.Text("JSON", weight=ft.FontWeight.W_600),
+                                icon=ft.Icons.DATA_OBJECT_ROUNDED,
+                                width=130,
+                                style=ft.ButtonStyle(bgcolor="#6b4f3a", color="#fffaf0"),
+                                on_click=lambda _: handle_export_option("json"),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+        export_dialog.actions = [ft.TextButton("Tutup", on_click=close_export_dialog)]
+        if getattr(export_dialog, "open", False):
+            page.update()
+            return
+        export_dialog.open = True
+        page.show_dialog(export_dialog)
 
     def build_qr_image_bytes(text: str) -> bytes:
         qr = qrcode.QRCode(border=2, box_size=8)
@@ -772,7 +1168,7 @@ def main(page: ft.Page) -> None:
                     info_bullet(ft.Icons.PLAY_ARROW_ROUNDED, "Pemeriksaan otomatis", "Setelah file atau folder dipilih, proses check berjalan otomatis dan hasil muncul di panel kanan."),
                     info_bullet(ft.Icons.VISIBILITY_ROUNDED, "Lihat detail", "Icon mata pada kolom Action membuka detail completeness per file."),
                     info_bullet(ft.Icons.ASSIGNMENT_TURNED_IN_ROUNDED, "Lihat follow up", "Icon follow up menampilkan data section 1.5 yang terisi."),
-                    info_bullet(ft.Icons.DOWNLOAD_ROUNDED, "Export hasil", "Gunakan Export PDF untuk ringkasan PDF dan Simpan CSV untuk menentukan lokasi hasil CSV."),
+                    info_bullet(ft.Icons.DOWNLOAD_ROUNDED, "Export hasil", "Gunakan tombol Export untuk memilih ringkasan PDF, JPG, atau JSON, dan Simpan CSV untuk lokasi file CSV."),
                     ft.Divider(color="#d9c9ab"),
                     ft.Text("Dokumen IPS dianggap complete jika", weight=ft.FontWeight.W_700, color="#16302b"),
                     info_bullet(ft.Icons.CHECK_CIRCLE_OUTLINE_ROUNDED, "Section 1.1 dan 1.2 valid", "Semua field wajib terisi, dengan trigger 1.1 cukup salah satu dari C6, C8, C10, atau C12."),
@@ -1051,6 +1447,9 @@ def main(page: ft.Page) -> None:
     refresh_results_table()
 
     def start_run_check(selected_target: str | None = None) -> None:
+        if selected_target:
+            app_state["target_path"] = selected_target
+        persist_config()
         set_loading(True)
         status_text.value = "Sedang memeriksa file Excel..."
         table_state["results"] = []
@@ -1154,8 +1553,12 @@ def main(page: ft.Page) -> None:
     folder_button.on_click = pick_target_folder
     file_button.on_click = pick_target_file
     csv_button.on_click = pick_csv_output
-    share_button.on_click = export_results_summary_pdf_action
+    share_button.on_click = show_export_dialog
     info_button.on_click = show_info_dialog
+    page.on_resize = handle_page_resize
+    page.on_close = handle_page_close
+    sync_window_size_from_page()
+    persist_config()
 
     page.add(
         ft.ResponsiveRow(
