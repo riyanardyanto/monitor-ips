@@ -265,6 +265,75 @@ def extract_row_based_section_entries(
     return entries
 
 
+def extract_workbook_field_data(
+    workbook_path: Path,
+    fields: Sequence[FieldSpec],
+    sheet_name: str | None,
+) -> list[dict[str, str]]:
+    workbook = load_workbook(workbook_path, data_only=True, read_only=True)
+    try:
+        worksheet = workbook[sheet_name] if sheet_name else workbook[workbook.sheetnames[0]]
+        extracted_rows: list[dict[str, str]] = []
+        for field in fields:
+            cell_values = {cell: stringify_cell_value(worksheet[cell].value) for cell in field.cells}
+            extracted_rows.append(
+                {
+                    "file_name": workbook_path.name,
+                    "sheet_name": worksheet.title,
+                    "section": field.section,
+                    "field": field.name,
+                    "cell_refs": ", ".join(field.cells),
+                    "cell_values": " | ".join(f"{cell}={value or '-'}" for cell, value in cell_values.items()),
+                    "extracted_value": " | ".join(value for value in cell_values.values() if value),
+                }
+            )
+        return extracted_rows
+    finally:
+        workbook.close()
+
+
+def write_field_data_csv(extracted_rows: Sequence[dict[str, str]], output_file: Path) -> None:
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    with output_file.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "file_name",
+                "sheet_name",
+                "section",
+                "field",
+                "cell_refs",
+                "cell_values",
+                "extracted_value",
+            ],
+        )
+        writer.writeheader()
+        writer.writerows(extracted_rows)
+
+
+def export_workbook_field_data_csv(
+    workbook_path: str | Path,
+    field_file: str | Path,
+    output_file: str | Path,
+    sheet_name: str | None = None,
+    base_dir: Path | None = None,
+) -> Path:
+    resolved_base_dir = base_dir or Path.cwd()
+    resolved_workbook_path = resolve_input_path(workbook_path, resolved_base_dir)
+    resolved_field_file = resolve_input_path(field_file, resolved_base_dir)
+    resolved_output_file = resolve_input_path(output_file, resolved_base_dir)
+
+    if not resolved_workbook_path.exists():
+        raise FileNotFoundError(f"Workbook file not found: {resolved_workbook_path}")
+    if not resolved_field_file.exists():
+        raise FileNotFoundError(f"Field file not found: {resolved_field_file}")
+
+    fields = parse_field_file(resolved_field_file)
+    extracted_rows = extract_workbook_field_data(resolved_workbook_path, fields, sheet_name)
+    write_field_data_csv(extracted_rows, resolved_output_file)
+    return resolved_output_file
+
+
 def check_workbook(workbook_path: Path, fields: Iterable[FieldSpec], sheet_name: str | None) -> dict[str, object]:
     field_list = list(fields)
     section_14_fields = filter_fields_to_rows(
@@ -352,6 +421,7 @@ def check_workbook(workbook_path: Path, fields: Iterable[FieldSpec], sheet_name:
 
         return {
             "file_name": workbook_path.name,
+            "workbook_path": str(workbook_path.resolve()),
             "sheet_name": worksheet.title,
             "participant": "" if participant_value is None else str(participant_value).strip(),
             "total_fields": sum(total_fields_by_section.values()),

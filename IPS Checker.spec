@@ -8,6 +8,9 @@ flet_desktop_datas = collect_data_files('flet_desktop')
 project_datas = [
     ('field_cell.txt', '.'),
     ('assets/app_icon.ico', 'assets'),
+    ('assets/ips.html', 'assets'),
+    ('docs/ips-checker-user-guide.pdf', 'docs'),
+    ('docs/ips-generator-user-guide.pdf', 'docs'),
 ]
 
 a = Analysis(

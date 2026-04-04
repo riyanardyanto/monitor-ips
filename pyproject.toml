@@ -11,5 +11,6 @@ dependencies = [
     "pyinstaller>=6.19.0",
     "qrcode>=8.2",
     "reportlab>=4.2.2",
+    "svglib>=1.6.0",
     "tabulate>=0.10.0",
 ]

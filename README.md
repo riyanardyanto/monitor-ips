@@ -1,8 +1,10 @@
 # Monitor IPS
 
-Desktop GUI untuk memeriksa completeness form Excel IPS berdasarkan cell wajib di field_cell.txt.
+Desktop GUI untuk memeriksa kelengkapan form Excel IPS berdasarkan cell wajib di `field_cell.txt`.
 
-## Jalankan GUI
+Project ini juga menyediakan IPS Generator berbasis HTML untuk membuat dokumen IPS baru melalui tombol `Buat IPS` di aplikasi utama atau langsung dari `assets/ips.html`.
+
+## Menjalankan Aplikasi
 
 ```powershell
 .venv\Scripts\python.exe main.py
@@ -10,7 +12,7 @@ Desktop GUI untuk memeriksa completeness form Excel IPS berdasarkan cell wajib d
 
 ## Build EXE
 
-Build final executable menggunakan file spec yang sudah disiapkan:
+Gunakan file spec yang sudah disiapkan untuk membuat executable final:
 
 ```powershell
 .venv\Scripts\python.exe -m PyInstaller --clean "IPS Checker.spec"
@@ -22,36 +24,65 @@ Hasil build akan tersedia di folder:
 dist\IPS Checker.exe
 ```
 
+Saat EXE dijalankan, aplikasi akan otomatis membuat struktur runtime berikut di samping file executable:
+
+```text
+data/
+	config/
+		ips-checker-config.json
+	database/
+		ips-follow-up-database.csv
+	docs/
+		ips-checker-user-guide.pdf
+		ips-generator-user-guide.pdf
+```
+
 Catatan:
 
-- Gunakan file `IPS Checker.spec` agar resource Flet dan `field_cell.txt` ikut terbundle dengan benar.
-- Jangan build dengan command PyInstaller minimal tanpa file spec, karena aplikasi membutuhkan data tambahan saat dijalankan sebagai `.exe`.
+- Gunakan file `IPS Checker.spec` agar resource Flet, `field_cell.txt`, `assets/ips.html`, dan PDF user guide ikut terbundle dengan benar.
+- Jangan menjalankan command PyInstaller minimal tanpa file spec, karena aplikasi membutuhkan data tambahan saat dijalankan sebagai `.exe`.
+- File config dan database lama di root project akan dimigrasikan otomatis ke folder `data` jika file tujuan belum ada.
 
 ## Fitur
 
 - Pilih folder atau satu file Excel
 - Pilih file mapping field
-- Simpan hasil ringkas ke CSV
-- Simpan config lokal untuk path terakhir, lokasi CSV terakhir, mode sheet terakhir, dan ukuran window
-- Tampilan hasil per file dengan jumlah field kosong per section
+- Tombol `Buat IPS` untuk membuka generator form IPS baru
+- Menyimpan config lokal untuk path terakhir, lokasi CSV terakhir, mode sheet terakhir, dan ukuran window
+- Menampilkan hasil per file beserta jumlah field kosong per section
+- Mendukung export sesuai view aktif di panel kanan: hasil pemeriksaan atau follow up countermeasure
+- Menyediakan user guide checker dan generator secara otomatis di folder runtime `data/docs`
 
 ## Fitur GUI
 
-- Kolom `Action` pada tabel hasil menyediakan tombol untuk membuka dialog `Detail` dan `Follow Up`.
-- Dialog `Detail` menampilkan informasi file, participant, status, completeness total, dan tabel persentase completeness per section.
+- `result panel` memiliki 2 tampilan yang dapat diganti dari menu bar: `Tabel Hasil Pemeriksaan` dan `Tabel Follow Up Countermeasure`.
+- Tombol `Buat IPS` di panel kiri membuka generator IPS dari `assets/ips.html`.
+- Kolom `Action` pada tabel hasil menyediakan tombol untuk membuka dialog `Detail`, `Follow Up`, dan `Open file` per file.
+- Dialog `Detail` menampilkan informasi file, participant, status, kelengkapan total, dan tabel persentase kelengkapan per section.
 - Dialog `Follow Up` menampilkan data section `1.5` yang terisi, yaitu `countermeasure`, `responsible`, dan `due date`.
-- Tombol `Share` pada dialog `Detail` menampilkan QR Code berisi summary completeness file yang sedang dipilih.
+- Tombol `Open file` membuka file IPS Excel asli dari baris hasil pemeriksaan yang dipilih.
+- Tampilan `Tabel Follow Up Countermeasure` memakai database lokal otomatis di file `data\database\ips-follow-up-database.csv`.
+- Database follow up otomatis dibuat jika belum ada, lalu diisi dari data section `1.5` setiap selesai pemeriksaan.
+- Kolom database follow up otomatis: `nama file`, `countermeasure`, `responsible`, `due date`, dan `status`.
+- Setiap baris pada `Tabel Follow Up Countermeasure` memiliki tombol edit untuk mengubah `status` langsung dari GUI dan menyimpannya ke database lokal otomatis.
+- Tombol `Share` pada dialog `Detail` menampilkan QR Code berisi ringkasan kelengkapan file yang sedang dipilih.
 - Tombol `Share` pada dialog `Follow Up` menampilkan QR Code berisi summary data follow up section `1.5`.
-- Tombol `Export` di side panel menampilkan pilihan export `PDF`, `JPG`, atau `JSON` untuk summary laporan data completeness form IPS yang sedang ada di tabel.
+- Tombol `Export` di AppBar menampilkan pilihan export `PDF`, `JPG`, `QR Code`, atau `Excel` sesuai view aktif.
 - Dialog `Share` juga menyediakan tombol `Copy Summary` untuk menyalin isi summary ke clipboard.
-- Aplikasi menyimpan file config lokal `ips-checker-config.json` untuk mengingat folder/file terakhir, lokasi CSV terakhir, mode sheet, nama sheet custom, dan ukuran window terakhir.
+- Aplikasi menyimpan file config lokal `data\config\ips-checker-config.json` untuk mengingat folder/file terakhir, lokasi export terakhir, mode sheet, nama sheet custom, dan ukuran window terakhir.
+
+## Dokumentasi
+
+- Panduan aplikasi utama tersedia di `docs/ips-checker-user-guide.pdf` pada source project.
+- Panduan IPS Generator tersedia di `docs/ips-generator-user-guide.pdf` pada source project.
+- Saat aplikasi berjalan, kedua PDF tersebut akan disalin ke folder runtime `data/docs`.
 
 ## Kriteria Complete
 
 Aturan umum:
 
-- Field dianggap complete jika semua cell yang didefinisikan di field tersebut terisi.
-- Completeness per section dihitung dari jumlah field atau rule section yang valid dibanding total rule pada section tersebut.
+- Field dianggap complete jika semua cell yang didefinisikan pada field tersebut terisi.
+- Nilai kelengkapan per section dihitung dari jumlah field atau rule section yang valid dibanding total rule pada section tersebut.
 
 Aturan khusus per section:
 
@@ -91,10 +122,10 @@ Aturan khusus per section:
 
 ## Rumus Completeness
 
-- Completeness section:
+- Kelengkapan per section:
 
 	`((total rule section - rule invalid section) / total rule section) * 100`
 
-- Completeness total file:
+- Kelengkapan total file:
 
 	rata-rata dari completeness semua section.

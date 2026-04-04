@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">Mockup IPS Generator</title>
+  <desc id="desc">Mockup halaman IPS Generator dengan hero, quick guide, form input utama, dan panel status unduhan.</desc>
+
+  <rect width="1600" height="980" fill="#f6f1e8" />
+  <rect x="34" y="30" width="1532" height="920" rx="30" fill="#fbf7ee" stroke="#d9cfbc" stroke-width="2" />
+
+  <rect x="70" y="64" width="1460" height="170" rx="28" fill="#16302b" />
+  <rect x="96" y="92" width="84" height="84" rx="22" fill="#0f5d46" />
+  <text x="138" y="144" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="700" fill="#f6f1e8">IPS</text>
+  <text x="208" y="118" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#fffaf0">IPS Form Generator</text>
+  <text x="208" y="154" font-family="Segoe UI, Arial, sans-serif" font-size="40" font-weight="700" fill="#fffaf0">Create New IPS</text>
+  <text x="208" y="188" font-family="Segoe UI, Arial, sans-serif" font-size="16" fill="#d9e8df">Isi tanggal, line, technology, trigger, dan problem description untuk membuat file Excel IPS baru.</text>
+  <rect x="1228" y="150" width="220" height="46" rx="14" fill="#e8e1d2" />
+  <text x="1338" y="179" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#16302b">Quick Guide</text>
+
+  <rect x="70" y="266" width="1460" height="238" rx="24" fill="#fffaf0" stroke="#d9cfbc" />
+  <text x="104" y="312" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700" fill="#16302b">Panduan visual singkat</text>
+  <text x="104" y="340" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#6b4f3a">Quick Guide di halaman membantu pengguna mengikuti urutan kerja sebelum mengisi form.</text>
+
+  <rect x="104" y="368" width="418" height="102" rx="18" fill="#f6efe1" stroke="#d9cfbc" />
+  <circle cx="144" cy="402" r="18" fill="#c96f3b" />
+  <text x="144" y="408" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#fffaf0">1</text>
+  <text x="176" y="396" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#16302b">Buka halaman generator</text>
+  <text x="176" y="424" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6b4f3a">Template default dimuat otomatis dan tombol unduh masih nonaktif.</text>
+
+  <rect x="556" y="368" width="418" height="102" rx="18" fill="#f6efe1" stroke="#d9cfbc" />
+  <circle cx="596" cy="402" r="18" fill="#c96f3b" />
+  <text x="596" y="408" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#fffaf0">2</text>
+  <text x="628" y="396" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#16302b">Isi field wajib utama</text>
+  <text x="628" y="424" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6b4f3a">Tanggal P8, Line P6, Technology Q14, dan Problem Description B19.</text>
+
+  <rect x="1008" y="368" width="418" height="102" rx="18" fill="#f6efe1" stroke="#d9cfbc" />
+  <circle cx="1048" cy="402" r="18" fill="#c96f3b" />
+  <text x="1048" y="408" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#fffaf0">3</text>
+  <text x="1080" y="396" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#16302b">Unduh dan lanjutkan</text>
+  <text x="1080" y="424" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6b4f3a">Document ID otomatis ditulis ke W6 dan file Excel siap dipakai.</text>
+
+  <rect x="70" y="536" width="1460" height="282" rx="24" fill="#fffaf0" stroke="#d9cfbc" />
+  <text x="104" y="580" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700" fill="#16302b">Form utama</text>
+
+  <rect x="104" y="608" width="280" height="72" rx="16" fill="#f8f2e6" stroke="#d9cfbc" />
+  <text x="126" y="636" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#16302b">Tanggal</text>
+  <text x="126" y="664" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6b4f3a">Cell P8, format tanggal, wajib diisi</text>
+
+  <rect x="404" y="608" width="280" height="72" rx="16" fill="#f8f2e6" stroke="#d9cfbc" />
+  <text x="426" y="636" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#16302b">Line</text>
+  <text x="426" y="664" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6b4f3a">Cell P6, pilihan line preset, wajib</text>
+
+  <rect x="704" y="608" width="384" height="72" rx="16" fill="#f8f2e6" stroke="#d9cfbc" />
+  <text x="726" y="636" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#16302b">Technology</text>
+  <text x="726" y="664" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6b4f3a">Cell Q14, daftar technology preset, wajib diisi</text>
+
+  <rect x="1108" y="608" width="318" height="72" rx="16" fill="#f8f2e6" stroke="#d9cfbc" />
+  <text x="1130" y="636" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#16302b">Trigger</text>
+  <text x="1130" y="664" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6b4f3a">Quality C6, Delivery C8, Cost C10, Other C12</text>
+
+  <rect x="104" y="704" width="1322" height="82" rx="16" fill="#f8f2e6" stroke="#d9cfbc" />
+  <text x="126" y="734" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#16302b">Problem Description</text>
+  <text x="126" y="762" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6b4f3a">Cell B19. Nilai akan diubah ke uppercase saat diproses dan ikut dipakai pada nama file output.</text>
+
+  <rect x="70" y="846" width="1460" height="72" rx="24" fill="#f3ebdb" stroke="#d9cfbc" />
+  <text x="104" y="890" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#16302b">Status panel</text>
+  <rect x="1264" y="864" width="198" height="38" rx="14" fill="#0f5d46" />
+  <text x="1363" y="889" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#fffaf0">Unduh hasil</text>
+</svg>
