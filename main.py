@@ -38,13 +38,16 @@ DATA_DIR = APP_DIR / "data"
 DATA_CONFIG_DIR = DATA_DIR / "config"
 DATA_DATABASE_DIR = DATA_DIR / "database"
 DATA_DOCS_DIR = DATA_DIR / "docs"
+DATA_LOG_DIR = DATA_DIR / "log"
 
-LOG_FILE = APP_DIR / "ips-checker-error.log"
+LEGACY_LOG_FILE = APP_DIR / "ips-checker-error.log"
+LOG_FILE = DATA_LOG_DIR / "ips-checker-error.log"
 ICON_FILE = RESOURCE_DIR / "assets" / "app_icon.ico"
 IPS_HTML_FILE = RESOURCE_DIR / "assets" / "ips.html"
 LEGACY_CONFIG_FILE = APP_DIR / "ips-checker-config.json"
 LEGACY_FOLLOW_UP_DB_FILE = APP_DIR / "ips-follow-up-database.csv"
 CONFIG_FILE = DATA_CONFIG_DIR / "ips-checker-config.json"
+RUNTIME_FIELD_FILE = DATA_CONFIG_DIR / "field_cell.txt"
 FOLLOW_UP_DB_FILE = DATA_DATABASE_DIR / "ips-follow-up-database.csv"
 CHECKER_GUIDE_FILE = DATA_DOCS_DIR / "ips-checker-user-guide.pdf"
 GENERATOR_GUIDE_FILE = DATA_DOCS_DIR / "ips-generator-user-guide.pdf"
@@ -99,12 +102,31 @@ def copy_file_if_newer(source_path: Path, destination_path: Path) -> None:
     shutil.copy2(source_path, destination_path)
 
 
+def get_default_field_file_path() -> Path:
+    if RUNTIME_FIELD_FILE.exists():
+        return RUNTIME_FIELD_FILE
+
+    bundled_field_file = RESOURCE_DIR / "field_cell.txt"
+    if bundled_field_file.exists():
+        return bundled_field_file
+
+    return APP_DIR / "field_cell.txt"
+
+
 def initialize_app_storage() -> None:
-    for directory in (DATA_DIR, DATA_CONFIG_DIR, DATA_DATABASE_DIR, DATA_DOCS_DIR):
+    for directory in (
+        DATA_DIR,
+        DATA_CONFIG_DIR,
+        DATA_DATABASE_DIR,
+        DATA_DOCS_DIR,
+        DATA_LOG_DIR,
+    ):
         directory.mkdir(parents=True, exist_ok=True)
 
+    migrate_file_if_missing(LEGACY_LOG_FILE, LOG_FILE)
     migrate_file_if_missing(LEGACY_CONFIG_FILE, CONFIG_FILE)
     migrate_file_if_missing(LEGACY_FOLLOW_UP_DB_FILE, FOLLOW_UP_DB_FILE)
+    copy_file_if_newer(RESOURCE_DIR / "field_cell.txt", RUNTIME_FIELD_FILE)
 
     source_docs_dir = RESOURCE_DIR / "docs"
     copy_file_if_newer(
@@ -122,7 +144,7 @@ def normalize_migrated_config_defaults() -> None:
         return
 
     try:
-        config_payload = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        config_payload = json.loads(CONFIG_FILE.read_text(encoding="utf-8-sig"))
     except Exception as exc:
         write_error_log("Gagal membaca config untuk normalisasi migrasi", exc)
         return
@@ -134,10 +156,18 @@ def normalize_migrated_config_defaults() -> None:
     normalized_payload["follow_up_db_path"] = str(FOLLOW_UP_DB_FILE)
 
     current_field_file = str(normalized_payload.get("field_file") or "").strip()
-    default_field_file = APP_DIR / "field_cell.txt"
-    if not default_field_file.exists():
-        default_field_file = RESOURCE_DIR / "field_cell.txt"
-    if not current_field_file:
+    default_field_file = get_default_field_file_path()
+    resolved_current_field_file = (
+        Path(current_field_file) if current_field_file else None
+    )
+    should_reset_field_file = not current_field_file
+    if (
+        resolved_current_field_file is not None
+        and not resolved_current_field_file.exists()
+    ):
+        should_reset_field_file = True
+
+    if should_reset_field_file:
         normalized_payload["field_file"] = str(default_field_file)
 
     if normalized_payload == config_payload:
@@ -178,7 +208,7 @@ def load_app_config(
         return config
 
     try:
-        loaded_config = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        loaded_config = json.loads(CONFIG_FILE.read_text(encoding="utf-8-sig"))
     except Exception as exc:
         write_error_log("Gagal membaca file config", exc)
         return config
@@ -188,6 +218,8 @@ def load_app_config(
 
     target_path = str(loaded_config.get("target_path") or config["target_path"])
     field_file = str(loaded_config.get("field_file") or config["field_file"])
+    if not Path(field_file).exists():
+        field_file = str(default_field_file)
     csv_output = str(loaded_config.get("csv_output") or config["csv_output"])
     sheet_mode = str(loaded_config.get("sheet_mode") or "auto").strip().lower()
     if sheet_mode not in {"auto", "custom"}:
@@ -505,9 +537,7 @@ def main(page: ft.Page) -> None:
     }
     side_button_width = 190
 
-    default_field_file = APP_DIR / "field_cell.txt"
-    if not default_field_file.exists():
-        default_field_file = RESOURCE_DIR / "field_cell.txt"
+    default_field_file = get_default_field_file_path()
 
     default_target_path = APP_DIR / "new create ips"
     if not default_target_path.exists():
@@ -554,6 +584,8 @@ def main(page: ft.Page) -> None:
         "results": [],
         "sort_column_index": 1,
         "sort_ascending": True,
+        "follow_up_sort_column_index": 0,
+        "follow_up_sort_ascending": True,
     }
     results_table = ft.Column(
         spacing=0,
@@ -1002,55 +1034,72 @@ def main(page: ft.Page) -> None:
                 controls=[
                     ft.Container(
                         width=220,
-                        content=ft.Text(
-                            "Nama File", weight=ft.FontWeight.W_700, color="#16302b"
+                        content=build_sortable_header_cell(
+                            "Nama File",
+                            table_state["follow_up_sort_column_index"],
+                            table_state["follow_up_sort_ascending"],
+                            0,
+                            toggle_follow_up_sort,
                         ),
                     ),
                     ft.Container(
                         expand=2,
-                        content=ft.Text(
+                        content=build_sortable_header_cell(
                             "Countermeasure",
-                            weight=ft.FontWeight.W_700,
-                            color="#16302b",
+                            table_state["follow_up_sort_column_index"],
+                            table_state["follow_up_sort_ascending"],
+                            1,
+                            toggle_follow_up_sort,
                         ),
                     ),
                     ft.Container(
                         width=115,
-                        content=ft.Text(
-                            "Responsible", weight=ft.FontWeight.W_700, color="#16302b"
+                        content=build_sortable_header_cell(
+                            "Responsible",
+                            table_state["follow_up_sort_column_index"],
+                            table_state["follow_up_sort_ascending"],
+                            2,
+                            toggle_follow_up_sort,
                         ),
                     ),
                     ft.Container(
                         width=95,
-                        content=ft.Text(
-                            "Due Date", weight=ft.FontWeight.W_700, color="#16302b"
+                        content=build_sortable_header_cell(
+                            "Due Date",
+                            table_state["follow_up_sort_column_index"],
+                            table_state["follow_up_sort_ascending"],
+                            3,
+                            toggle_follow_up_sort,
                         ),
                     ),
                     ft.Container(
                         width=78,
-                        content=ft.Text(
-                            "Status", weight=ft.FontWeight.W_700, color="#16302b"
+                        content=build_sortable_header_cell(
+                            "Status",
+                            table_state["follow_up_sort_column_index"],
+                            table_state["follow_up_sort_ascending"],
+                            4,
+                            toggle_follow_up_sort,
                         ),
                     ),
                     ft.Container(
                         width=96,
-                        content=ft.Text(
+                        content=build_sortable_header_cell(
                             "Standard ID",
-                            weight=ft.FontWeight.W_700,
-                            color="#16302b",
+                            table_state["follow_up_sort_column_index"],
+                            table_state["follow_up_sort_ascending"],
+                            5,
+                            toggle_follow_up_sort,
                         ),
                     ),
                     ft.Container(
                         width=114,
-                        content=ft.Row(
-                            alignment=ft.MainAxisAlignment.CENTER,
-                            controls=[
-                                ft.Text(
-                                    "Action",
-                                    weight=ft.FontWeight.W_700,
-                                    color="#16302b",
-                                )
-                            ],
+                        content=build_sortable_header_cell(
+                            "Action",
+                            table_state["follow_up_sort_column_index"],
+                            table_state["follow_up_sort_ascending"],
+                            None,
+                            toggle_follow_up_sort,
                         ),
                     ),
                 ],
@@ -1244,8 +1293,11 @@ def main(page: ft.Page) -> None:
 
         app_state["follow_up_db_rows"] = rows
         app_state["follow_up_db_error"] = ""
+        sort_follow_up_rows(
+            table_state["follow_up_sort_column_index"],
+            table_state["follow_up_sort_ascending"],
+        )
         persist_config()
-        refresh_follow_up_db_table()
         if update_page:
             notify("Database follow up otomatis berhasil dimuat.")
             page.update()
@@ -1272,8 +1324,11 @@ def main(page: ft.Page) -> None:
 
         app_state["follow_up_db_rows"] = merged_rows
         app_state["follow_up_db_error"] = ""
+        sort_follow_up_rows(
+            table_state["follow_up_sort_column_index"],
+            table_state["follow_up_sort_ascending"],
+        )
         persist_config()
-        refresh_follow_up_db_table()
         if update_page:
             page.update()
 
@@ -1442,7 +1497,10 @@ def main(page: ft.Page) -> None:
 
         app_state["follow_up_db_rows"] = updated_rows
         app_state["follow_up_db_error"] = ""
-        refresh_follow_up_db_table()
+        sort_follow_up_rows(
+            table_state["follow_up_sort_column_index"],
+            table_state["follow_up_sort_ascending"],
+        )
         close_edit_follow_up_status_dialog(None)
         notify("Status follow up berhasil diperbarui.")
 
@@ -1469,7 +1527,10 @@ def main(page: ft.Page) -> None:
 
         app_state["follow_up_db_rows"] = updated_rows
         app_state["follow_up_db_error"] = ""
-        refresh_follow_up_db_table()
+        sort_follow_up_rows(
+            table_state["follow_up_sort_column_index"],
+            table_state["follow_up_sort_ascending"],
+        )
         close_delete_follow_up_dialog(None)
         notify("Data follow up berhasil dihapus.")
 
@@ -3669,19 +3730,72 @@ def main(page: ft.Page) -> None:
         table_state["results"] = results
         refresh_results_table()
 
+    def sort_follow_up_rows(column_index: int, ascending: bool) -> None:
+        table_state["follow_up_sort_column_index"] = column_index
+        table_state["follow_up_sort_ascending"] = ascending
+
+        def string_key(row: dict[str, object], field_name: str) -> str:
+            return str(row.get(field_name) or "").strip().casefold()
+
+        rows = list(app_state["follow_up_db_rows"])
+        if column_index == 0:
+            rows.sort(
+                key=lambda row: string_key(row, "nama_file"),
+                reverse=not ascending,
+            )
+        elif column_index == 1:
+            rows.sort(
+                key=lambda row: string_key(row, "countermeasure"),
+                reverse=not ascending,
+            )
+        elif column_index == 2:
+            rows.sort(
+                key=lambda row: string_key(row, "responsible"),
+                reverse=not ascending,
+            )
+        elif column_index == 3:
+            rows.sort(
+                key=lambda row: string_key(row, "due_date"),
+                reverse=not ascending,
+            )
+        elif column_index == 4:
+            rows.sort(
+                key=lambda row: string_key(row, "status"),
+                reverse=not ascending,
+            )
+        elif column_index == 5:
+            rows.sort(
+                key=lambda row: string_key(row, "standard_id"),
+                reverse=not ascending,
+            )
+
+        app_state["follow_up_db_rows"] = rows
+        refresh_follow_up_db_table()
+
     def toggle_sort(column_index: int) -> None:
         if table_state["sort_column_index"] == column_index:
             sort_results(column_index, not table_state["sort_ascending"])
             return
         sort_results(column_index, True)
 
-    def build_header_cell(label: str, column_index: int | None = None) -> ft.Control:
+    def toggle_follow_up_sort(column_index: int) -> None:
+        if table_state["follow_up_sort_column_index"] == column_index:
+            sort_follow_up_rows(
+                column_index, not table_state["follow_up_sort_ascending"]
+            )
+            return
+        sort_follow_up_rows(column_index, True)
+
+    def build_sortable_header_cell(
+        label: str,
+        active_column_index: int,
+        is_ascending: bool,
+        column_index: int | None,
+        toggle_handler,
+    ) -> ft.Control:
         sort_suffix = ""
-        if (
-            column_index is not None
-            and table_state["sort_column_index"] == column_index
-        ):
-            sort_suffix = "  ^" if table_state["sort_ascending"] else "  v"
+        if column_index is not None and active_column_index == column_index:
+            sort_suffix = "  ^" if is_ascending else "  v"
 
         label_text = ft.Text(
             f"{label}{sort_suffix}",
@@ -3704,7 +3818,16 @@ def main(page: ft.Page) -> None:
                 color="#16302b",
                 overlay_color="#00000000",
             ),
-            on_click=lambda _: toggle_sort(column_index),
+            on_click=lambda _: toggle_handler(column_index),
+        )
+
+    def build_header_cell(label: str, column_index: int | None = None) -> ft.Control:
+        return build_sortable_header_cell(
+            label,
+            table_state["sort_column_index"],
+            table_state["sort_ascending"],
+            column_index,
+            toggle_sort,
         )
 
     def build_result_row(result: dict[str, object], row_index: int) -> ft.Control:

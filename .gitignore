@@ -11,3 +11,4 @@ wheels/
 
 # Local app state
 ips-checker-config.json
+data/

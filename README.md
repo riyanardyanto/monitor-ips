@@ -35,13 +35,15 @@ data/
 	docs/
 		ips-checker-user-guide.pdf
 		ips-generator-user-guide.pdf
+	log/
+		ips-checker-error.log
 ```
 
 Catatan:
 
 - Gunakan file `IPS Checker.spec` agar resource Flet, `field_cell.txt`, `assets/ips.html`, dan PDF user guide ikut terbundle dengan benar.
 - Jangan menjalankan command PyInstaller minimal tanpa file spec, karena aplikasi membutuhkan data tambahan saat dijalankan sebagai `.exe`.
-- File config dan database lama di root project akan dimigrasikan otomatis ke folder `data` jika file tujuan belum ada.
+- File config, database, dan log lama di root project akan dimigrasikan otomatis ke folder `data` jika file tujuan belum ada.
 
 ## Fitur
 
@@ -52,6 +54,7 @@ Catatan:
 - Menampilkan hasil per file beserta jumlah field kosong per section
 - Mendukung export sesuai view aktif di panel kanan: hasil pemeriksaan atau follow up countermeasure
 - Menyediakan user guide checker dan generator secara otomatis di folder runtime `data/docs`
+- Menyimpan log error aplikasi secara otomatis di `data/log/ips-checker-error.log`
 
 ## Fitur GUI
 
@@ -76,6 +79,12 @@ Catatan:
 - Panduan aplikasi utama tersedia di `docs/ips-checker-user-guide.pdf` pada source project.
 - Panduan IPS Generator tersedia di `docs/ips-generator-user-guide.pdf` pada source project.
 - Saat aplikasi berjalan, kedua PDF tersebut akan disalin ke folder runtime `data/docs`.
+
+## Log Error
+
+- Jika terjadi error saat aplikasi berjalan, log akan disimpan ke `data/log/ips-checker-error.log`.
+- File log di root project versi lama akan dipindahkan otomatis ke folder `data/log` jika file log baru belum ada.
+- Log ini mencatat waktu kejadian, tipe error, pesan error, dan traceback untuk membantu proses troubleshooting.
 
 ## Kriteria Complete
 
