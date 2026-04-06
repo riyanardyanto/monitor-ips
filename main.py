@@ -39,11 +39,13 @@ DATA_CONFIG_DIR = DATA_DIR / "config"
 DATA_DATABASE_DIR = DATA_DIR / "database"
 DATA_DOCS_DIR = DATA_DIR / "docs"
 DATA_LOG_DIR = DATA_DIR / "log"
+DATA_ASSETS_DIR = DATA_DIR / "assets"
 
 LEGACY_LOG_FILE = APP_DIR / "ips-checker-error.log"
 LOG_FILE = DATA_LOG_DIR / "ips-checker-error.log"
 ICON_FILE = RESOURCE_DIR / "assets" / "app_icon.ico"
 IPS_HTML_FILE = RESOURCE_DIR / "assets" / "ips.html"
+RUNTIME_IPS_HTML_FILE = DATA_ASSETS_DIR / "ips.html"
 LEGACY_CONFIG_FILE = APP_DIR / "ips-checker-config.json"
 LEGACY_FOLLOW_UP_DB_FILE = APP_DIR / "ips-follow-up-database.csv"
 CONFIG_FILE = DATA_CONFIG_DIR / "ips-checker-config.json"
@@ -120,6 +122,7 @@ def initialize_app_storage() -> None:
         DATA_DATABASE_DIR,
         DATA_DOCS_DIR,
         DATA_LOG_DIR,
+        DATA_ASSETS_DIR,
     ):
         directory.mkdir(parents=True, exist_ok=True)
 
@@ -127,6 +130,7 @@ def initialize_app_storage() -> None:
     migrate_file_if_missing(LEGACY_CONFIG_FILE, CONFIG_FILE)
     migrate_file_if_missing(LEGACY_FOLLOW_UP_DB_FILE, FOLLOW_UP_DB_FILE)
     copy_file_if_newer(RESOURCE_DIR / "field_cell.txt", RUNTIME_FIELD_FILE)
+    copy_file_if_newer(IPS_HTML_FILE, RUNTIME_IPS_HTML_FILE)
 
     source_docs_dir = RESOURCE_DIR / "docs"
     copy_file_if_newer(
@@ -536,6 +540,7 @@ def main(page: ft.Page) -> None:
         "1.5": "1.5. Ask WHY WHY",
     }
     side_button_width = 190
+    side_panel_width = 220
 
     default_field_file = get_default_field_file_path()
 
@@ -582,7 +587,7 @@ def main(page: ft.Page) -> None:
     }
     table_state = {
         "results": [],
-        "sort_column_index": 1,
+        "sort_column_index": 2,
         "sort_ascending": True,
         "follow_up_sort_column_index": 0,
         "follow_up_sort_ascending": True,
@@ -2843,12 +2848,13 @@ def main(page: ft.Page) -> None:
         if app_state["is_picker_open"] or app_state["is_loading"]:
             return
 
-        if not IPS_HTML_FILE.exists():
-            notify(f"File tidak ditemukan: {IPS_HTML_FILE.name}", error=True)
+        html_file = RUNTIME_IPS_HTML_FILE
+        if not html_file.exists():
+            notify(f"File tidak ditemukan: {html_file.name}", error=True)
             return
 
         try:
-            os.startfile(str(IPS_HTML_FILE))
+            os.startfile(str(html_file))
         except Exception as exc:
             log_path = write_error_log("Buka file IPS generator gagal", exc)
             notify(str(exc), error=True)
@@ -3723,6 +3729,11 @@ def main(page: ft.Page) -> None:
             )
         elif column_index == 1:
             results.sort(
+                key=lambda item: str(item.get("participant") or "").casefold(),
+                reverse=not ascending,
+            )
+        elif column_index == 2:
+            results.sort(
                 key=lambda item: float(item["completeness_percentage"]),
                 reverse=not ascending,
             )
@@ -3850,6 +3861,15 @@ def main(page: ft.Page) -> None:
                         ),
                     ),
                     ft.Container(
+                        width=220,
+                        content=ft.Text(
+                            str(result.get("participant") or "-"),
+                            color="#4b5d58",
+                            overflow=ft.TextOverflow.ELLIPSIS,
+                            max_lines=1,
+                        ),
+                    ),
+                    ft.Container(
                         width=190,
                         content=build_completeness_cell(result),
                     ),
@@ -3896,7 +3916,10 @@ def main(page: ft.Page) -> None:
                         expand=True, content=build_header_cell("File Name", 0)
                     ),
                     ft.Container(
-                        width=190, content=build_header_cell("Completeness %", 1)
+                        width=220, content=build_header_cell("Participant", 1)
+                    ),
+                    ft.Container(
+                        width=190, content=build_header_cell("Completeness %", 2)
                     ),
                     ft.Container(width=96, content=build_header_cell("Action")),
                 ],
@@ -3923,7 +3946,9 @@ def main(page: ft.Page) -> None:
     def start_run_check(selected_target: str | None = None) -> None:
         if selected_target:
             app_state["target_path"] = selected_target
+        app_state["result_view"] = "check-results"
         persist_config()
+        refresh_result_panel_view()
         set_loading(True)
         table_state["results"] = []
         refresh_results_table()
@@ -3971,7 +3996,7 @@ def main(page: ft.Page) -> None:
         notify("Pemeriksaan selesai.")
 
     form_panel = ft.Container(
-        expand=True,
+        width=side_panel_width,
         bgcolor="#fffaf0",
         border_radius=24,
         padding=24,
@@ -4032,8 +4057,8 @@ def main(page: ft.Page) -> None:
             spacing=24,
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
             controls=[
-                ft.Container(expand=2, content=form_panel),
-                ft.Container(expand=10, content=result_panel),
+                form_panel,
+                result_panel,
             ],
         ),
     )
